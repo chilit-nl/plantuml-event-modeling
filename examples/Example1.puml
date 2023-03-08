@@ -1,0 +1,27 @@
+@startuml
+!include_once https://raw.githubusercontent.com/chilit-nl/plantuml-event-modeling/main/event-modeling-lib.iuml
+
+$enableAutoAlias()
+$enableAutoSpacing()
+
+' Configure the name of the lanes
+$configureWireframeLane(Customer)
+$configureWireframeLane(Employee)
+$configureEventLane(Order, $context = Order)
+
+' Provide all elements in left-to-right order
+$wireframe(OrderScreen, Customer)
+$command(SubmitOrder)
+$event(OrderSubmitted, Order)
+$view(Orders)
+$arrow(Orders, OrderScreen)
+
+$wireframe(EmployeeScreen, Employee)
+$command(DispatchOrder)
+$event(OrderDispatched, Order)
+$view(Orders)
+$wireframe(OrderScreen, Customer)
+
+' Render the diagram
+$renderEventModelingDiagram()
+@enduml

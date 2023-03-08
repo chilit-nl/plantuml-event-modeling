@@ -1,0 +1,49 @@
+@startuml
+!include_once https://raw.githubusercontent.com/chilit-nl/plantuml-event-modeling/main/event-modeling-lib.iuml
+
+$enableAutoAlias()
+$enableAutoSpacing()
+
+$configureWireframeLane(Manager)
+$configureWireframeLane(Guest)
+$configureEventLane(Lesson)
+$configureEventLane(Account)
+$configureEventLane(Payment)
+
+' Based on https://developer.axoniq.io/w/from-model-to-code-event-modeling-axon-framework
+$wireframe(Registration Screen, Guest)
+$command(Register Account)
+$event(Account Registered, Account)
+
+$wireframe(Add Lesson Screen, Manager, $offset = 4)
+$command(Add Lesson)
+$event(Lesson Added, Lesson, $offset = 1)
+$view(Lesson Availability)
+
+$wireframe(Lesson Selection Screen, Guest)
+$command(Book Lesson)
+$event(Lesson Request Rejected, Lesson)
+$view(Lesson Availability)
+
+$wireframe(Payment Details Screen, Guest)
+$command(Book Lesson)
+$event(Lesson Booked, Lesson)
+$arrow(Payment Details Screen, Pay)
+$command(Pay)
+$event(Payment Requested, Payment)
+$view(Payments to Process)
+
+$wireframe(Payment Approval Screen, Manager, $offset = 4)
+$command(Process Payment, $offset = 3)
+$event(Payment Rejected, Payment)
+$view(Payments to Process)
+
+$wireframe(Payment Approval Screen, Manager)
+$command(Process Payment)
+$event(Payment Accepted, Payment)
+$view(Reports)
+
+$wireframe(Lesson Bookings Screen, Manager)
+
+$renderEventModelingDiagram()
+@enduml

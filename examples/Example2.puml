@@ -1,0 +1,8 @@
+@startuml
+!include_once https://raw.githubusercontent.com/chilit-nl/plantuml-event-modeling/main/event-modeling-lib.iuml
+
+$wireframe(<img:http://plantuml.com/logo3.png>, $alias = "imageElement")
+$event(OrderSubmitted\n---\n<b>Example of a \n<b>comment, $alias = "OrderSubmitted")
+
+$renderEventModelingDiagram()
+@enduml
