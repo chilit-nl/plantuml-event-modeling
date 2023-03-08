@@ -1,0 +1,700 @@
+@startuml
+/'
+    Event Modeling library for PlantUML
+
+    This library is built for fast creation of Event Modeling diagrams in PlantUML.
+    More info: https://github.com/chilit-nl/plantuml-event-modeling
+
+    Author: Marries van de Hoef
+    Version: 1.0
+    Tested with PlantUML version: 1.2023.0 - 1.2023.3beta5
+    License: GPLv3 - https://www.gnu.org/licenses/gpl-3.0.html
+'/
+<style>
+    .command {
+        BackgroundColor lightblue
+    }
+    .event {
+        BackgroundColor orange
+    }
+    .view {
+        BackgroundColor palegreen
+    }
+    .concept {
+        BackgroundColor yellow
+    }
+    .extra {
+        BackgroundColor #eee
+    }
+    .wireframe {
+        BackgroundColor #fff
+    }
+    .hidden {
+        FontSize 0
+        LineThickness 0
+        LineColor #fff
+        BackgroundColor #fff
+    }
+    .eventarrow {
+        arrow {
+            LineColor orange
+            LineThickness 2
+        }
+    }
+    .commandarrow {
+        arrow {
+            LineColor lightblue
+            LineThickness 2
+        }
+    }
+    .defaultarrow {
+        arrow {
+            LineColor black
+            LineThickness 2
+        }
+    }
+</style>
+
+/'
+**************** PlantUML configuration commands *********************
+'/
+
+' Other linetypes than ortho are not rendered correctly
+skinparam linetype ortho
+skinparam defaultTextAlignment center
+
+' allowmixing (using figures from other diagrams than deployment) is not supported as it currently disallows arrow stereotypes (styles)
+'   A workaround is possible by not using arrow stereotypes, but instead style them within the arrow: -[#pink,thickness=10]->
+' allowmixing
+
+hide <<extra>> stereotype
+
+/'
+**************** Configuration variables *********************
+'/
+
+!$default_figure = "file"
+
+!$default_heading_name = " "
+!$default_heading_alias = "heading"
+!$default_heading_figure = "rectangle"
+!$default_heading_stereotype = "hidden"
+
+!$event_heading_default_figure = $default_figure
+!$wireframe_heading_default_figure = "actor"
+!$context_default_figure = "frame"
+
+!$configuration_enable_auto_alias = 0
+!$configuration_enable_auto_spacing = 0
+
+!$autospacing_averagePixelsPerCharacter = 7
+!$autospacing_defaultNodeWidth = 55
+!$autospacing_pixelsPerLineIncrement = 35
+
+/'
+**************** Pseudo data structures used *********************
+The PlantUML preprocessor does not support any data structure, not even arrays.
+Data structures are faked by using configurable variable names.
+This section describes all configurable variable names.
+The variables can be mutated using $_get, $_set, and $_exists
+'/
+
+' *********** Data structures used to record for rendering:
+' * Lane types
+!function $_laneTypeOrder($laneTypeIndex) !return "$laneTypeOrder-" + $laneTypeIndex
+!$_laneTypeOrderMaxIndex = "$laneTypeOrder-maxIndex"
+' * Lanes
+!function $_laneMaxIndex($laneType) !return "$" + $laneType + "-maxIndex"
+' * Lane heading
+' Supported properties: name, alias, figure, stereotype
+!function $_heading($laneType, $laneIndex, $property) !return "$" + $laneType + "-" + $laneIndex + "-heading-" + $property
+' * Lane context
+' Supported properties: name, alias
+!function $_context($laneType, $laneIndex, $property) !return "$" + $laneType + "-" + $laneIndex + "-context-" + $property
+
+' * Nodes
+' Supported properties: name, alias, figure, stereotype, distanceToPrevious
+!function $_node($laneType, $laneIndex, $itemIndex, $property) !return "$" + $laneType + "-" + $laneIndex + "-items-" + $itemIndex + "-" + $property
+!function $_nodeMaxIndex($laneType, $laneIndex) !return "$" + $laneType + "-" + $laneIndex + "-items-maxIndex"
+
+' * Arrows
+' Supported properties: fromAlias, toAlias, stereotype, arrowHead
+!function $_arrow($arrowIndex, $property) !return "$arrows-" + $arrowIndex + "-" + $property
+!$_arrowsMaxIndex = "$arrows-maxIndex"
+
+
+' *********** Temporary data structures used during recording:
+!function $_aliasStorage($alias) !return "$aliasStorage-" + $alias
+!function $_laneIndexLookup($laneType, $laneAlias) !return "$" + $laneType + "-indexlookup-" + $laneAlias
+!function $_contextNameToAlias($contextName) !return "$contextNameToAlias-" + $contextName
+
+' Tracks current lane width for autospacing
+!function $_laneWidth($laneType, $laneIndex) !return "$" + $laneType + "-" + $laneIndex + "-laneWidth"
+' Tracks desired position of new insertions
+!$_currentWidth = "$autospacing-currentWidth"
+
+' Remembers some properties of the previously added node, to use when autoadding an arrow between nodes
+' Supported properties: alias, stereotype
+!function $_previousNode($property) !return "$autoArrowPrevious-" + $property
+
+' *********** Temporary data structures used during rendering:
+!$_previousHeadingNodeAlias = "$render-previousHeadingNodeAlias"
+!$_previousLaneContext = "$render-previousLaneContextAlias"
+
+
+/'
+**************** Utility functions *********************
+'/
+!function $_get($varName)
+    !return %get_variable_value($varName)
+!endfunction
+
+!function $_set($varName, $value)
+    !return %set_variable_value($varName, $value)
+!endfunction
+
+!function $_exists($varName)
+    !return %variable_exists($varName)
+!endfunction
+
+!function $_getAppendIndex($maxIndexStorageVariableName)
+    !$index = 0
+    !if $_exists($maxIndexStorageVariableName)
+        !$index = $_get($maxIndexStorageVariableName) + 1
+    !endif
+    $_set($maxIndexStorageVariableName, $index)
+    !return $index
+!endfunction
+
+!function $_incrementsNeededForUnusedVariableName($variableName)
+    !$increment = 1
+    !while $_exists($variableName + $increment)
+        !$increment = $increment + 1
+    !endwhile
+    !return $increment
+!endfunction
+
+!function $_removeSpaces($text)
+    !$spacePos = %strpos($text, " ")
+    !while $spacePos >= 0
+        !$split1 = %substr($text, 0, $spacePos)
+        !$split2 = %substr($text, $spacePos + 1)
+        !$text = $split1 + $split2
+        !$spacePos = %strpos($text, " ")
+    !endwhile
+    !return $text
+!endfunction
+
+!function $_createOrVerifyAlias($name, $alias = "")
+    !if $alias == ""
+        !$alias = $name
+    !endif
+
+    !$alias = $_removeSpaces($alias)
+
+    ' Check if alias already exists
+    !if $_exists($_aliasStorage($alias))
+        !if $configuration_enable_auto_alias == 0
+            !$errormessage = "Name or alias already exists: " + $alias
+            !$suggestion "
+                -----------------------------
+                Enable automatic alias generation by calling 'enableAutoAlias()'.
+                This will generate Name, Name1, Name2, etc.
+                -----------------------------"
+            !assert %false() : $errormessage
+        !else
+            ' Generate a new alias by enumerating on the name
+            !$increments = $_incrementsNeededForUnusedVariableName($_aliasStorage($alias))
+            !$alias = $alias + $increments
+        !endif
+    !endif
+
+    ' Record the existence of this alias
+    $_set($_aliasStorage($alias), 1)
+
+    !return $alias
+!endfunction
+
+' Converts lane alias to lane index
+!function $_lookupLaneIndex($laneType, $laneAlias)
+    !$laneIndex = 0
+    !if $_exists($_laneIndexLookup($laneType, $laneAlias))
+        ' Lane is already known
+        !$laneIndex = $_get($_laneIndexLookup($laneType, $laneAlias))
+    !else
+        ' Register new lane
+        !$laneIndex = $_getAppendIndex($_laneMaxIndex($laneType))
+        $_set($_laneIndexLookup($laneType, $laneAlias), $laneIndex)
+    !endif
+
+    !return $laneIndex
+!endfunction
+
+!function $_getVarOrDefault($variableName, $default)
+    !if $_exists($variableName)
+        !return $_get($variableName)
+    !endif
+    !return $default
+!endfunction
+
+!function $_max($a, $b)
+    !if $a > $b
+        !return $a
+    !endif
+    !return $b
+!endfunction
+
+!function $_divRounded($a, $b)
+    !return (2*$a + $b) / (2*$b)
+!endfunction
+
+!function $_repeatString($str, $times)
+    !$times = %intval($times)
+    !$result = ""
+    !$index = 0
+    !while $index < $times
+        !$result = $result + $str
+        !$index = $index + 1
+    !endwhile
+    !return $result
+!endfunction
+
+!function $_estimateTextWidthInPixels($text)
+    !return %strlen($text) * $autospacing_averagePixelsPerCharacter
+!endfunction
+
+' For multiline text, find the line with the highest estimated width
+!function $_longestLineWidthInPixels($text)
+    !$lineBreakPos = %strpos($text, "\n")
+    !$maxWidth = 0
+    !while $lineBreakPos >= 0
+        !$split1 = %substr($text, 0, $lineBreakPos)
+        !$split2 = %substr($text, $lineBreakPos + 2)
+
+        !$maxWidth = $_max($maxWidth, $_estimateTextWidthInPixels($split1))
+
+        !$text = $split2
+        !$lineBreakPos = %strpos($text, "\n")
+    !endwhile
+
+    !$maxWidth = $_max($maxWidth, $_estimateTextWidthInPixels($text))
+
+    !return $maxWidth
+!endfunction
+
+' This is a bit of magic as exact numbers cannot be extracted from PlantUML
+!function $_estimateNodeWidthInPixels($figure, $name)
+    !if $figure == "file" || $figure == "rectangle"
+        ' 55 pixels was measured (incl margin, padding, and default line to next node)
+        !return 55 + $_longestLineWidthInPixels($name)
+    !elseif $figure == "actor"
+        ' 36 is the margin + default line width, 26 is the actor with
+        !return 36 + $_max(26, $_longestLineWidthInPixels($name))
+    !endif
+    !return $autospacing_defaultNodeWidth + $_longestLineWidthInPixels($name)
+!endfunction
+
+/'
+**************** Private procedures to record nodes, lanes, and arrows *********************
+'/
+
+!procedure $_addArrow($fromAlias, $toAlias, $stereotype, $arrowHead = ">")
+    !$arrowIndex = $_getAppendIndex($_arrowsMaxIndex)
+
+    !$fromAlias = $_removeSpaces($fromAlias)
+    !$toAlias = $_removeSpaces($toAlias)
+
+    $_set($_arrow($arrowIndex, "fromAlias"), $fromAlias)
+    $_set($_arrow($arrowIndex, "toAlias"), $toAlias)
+    $_set($_arrow($arrowIndex, "stereotype"), $stereotype)
+    $_set($_arrow($arrowIndex, "arrowHead"), $arrowHead)
+!endprocedure
+
+!procedure $_autoConfigureLaneTypes()
+    $_set($_laneTypeOrder(0), "extra")
+    $_set($_laneTypeOrder(1), "wireframe")
+    $_set($_laneTypeOrder(2), "commandview")
+    $_set($_laneTypeOrder(3), "event")
+    $_set($_laneTypeOrderMaxIndex, 3)
+!endprocedure
+$_autoConfigureLaneTypes()
+
+!procedure $_configureLane($laneType, $laneIndex, $laneAlias, $headingName, $headingFigure, $headingStereotype, $headingAlias, $contextName = "")
+    $_set($_heading($laneType, $laneIndex, "name"), $headingName)
+    $_set($_heading($laneType, $laneIndex, "alias"), $headingAlias)
+    $_set($_heading($laneType, $laneIndex, "figure"), $headingFigure)
+    $_set($_heading($laneType, $laneIndex, "stereotype"), $headingStereotype)
+
+    !if $contextName != ""
+        ' Retrieve a previous contextAlias for this name, if present
+        !$contextAlias = ""
+        !if $_exists($_contextNameToAlias($contextName))
+            !$contextAlias = $_get($_contextNameToAlias($contextName))
+        !else
+            !$contextAlias = $_createOrVerifyAlias($contextName)
+            $_set($_contextNameToAlias($contextName), $contextAlias)
+        !endif
+        $_set($_context($laneType, $laneIndex, "name"), $contextName)
+        $_set($_context($laneType, $laneIndex, "alias"), $contextAlias)
+    !endif
+!endprocedure
+
+!procedure $_storeNode($laneType, $laneIndex, $itemIndex, $name, $alias, $figure, $stereotype, $distanceToPrevious)
+    $_set($_node($laneType, $laneIndex, $itemIndex, "name"), $name)
+    $_set($_node($laneType, $laneIndex, $itemIndex, "alias"), $alias)
+    $_set($_node($laneType, $laneIndex, $itemIndex, "figure"), $figure)
+    $_set($_node($laneType, $laneIndex, $itemIndex, "stereotype"), $stereotype)
+    $_set($_node($laneType, $laneIndex, $itemIndex, "distanceToPrevious"), $distanceToPrevious)
+!endprocedure
+
+!procedure $_insertHeadingNode($laneType, $laneIndex, $itemIndex)
+    ' Retrieve heading info
+    !$headingName = $default_heading_name
+    !$headingAlias = $default_heading_alias + $laneType + $laneIndex
+    !$headingFigure = $default_heading_figure
+    !$headingStereotype = $default_heading_stereotype
+
+    !if $_exists($_heading($laneType, $laneIndex, "name"))
+        !$headingName = $_get($_heading($laneType, $laneIndex, "name"))
+    !endif
+    !if $_exists($_heading($laneType, $laneIndex, "alias"))
+        !$headingAlias = $_get($_heading($laneType, $laneIndex, "alias"))
+    !else
+        !$headingAlias = $_createOrVerifyAlias($headingName, $headingAlias)
+    !endif
+    !if $_exists($_heading($laneType, $laneIndex, "figure"))
+        !$headingFigure = $_get($_heading($laneType, $laneIndex, "figure"))
+    !endif
+    !if $_exists($_heading($laneType, $laneIndex, "stereotype"))
+        !$headingStereotype = $_get($_heading($laneType, $laneIndex, "stereotype"))
+    !endif
+
+    $_storeNode($laneType, $laneIndex, $itemIndex, $headingName, $headingAlias, $headingFigure, $headingStereotype, 0)
+
+    !if $configuration_enable_auto_spacing == 1
+        ' Initialize laneWidth
+        ' The center of the heading nodes are the starting point for the laneWidth (because these centers are positioned vertically beneath each other)
+        !$startingWidth = $_divRounded($_estimateNodeWidthInPixels($headingFigure, $headingName), 2)
+        $_set($_laneWidth($laneType, $laneIndex), $startingWidth)
+    !endif
+!endprocedure
+
+!function $_computeAutoSpacing($laneType, $laneIndex, $name, $figure, $offset)
+    ' The desired position is based on the pixel position defined in $currentWidth
+    '   It is determined based on the previous node:
+    '    - It is placed on the same horizontal position as the previous node
+    '    - Except after an event. Then it moves to the right of the event
+    '   Note that a node can be automatically moved to the right when no space is available in the current lane
+    '     In that case, all following nodes will also move to the right
+    !$currentWidth = $_getVarOrDefault($_currentWidth, 0)
+    !$desiredPosition = $currentWidth
+
+    ' Calculate the necessary number of line segments to add
+    !$laneWidth = $_getVarOrDefault($_laneWidth($laneType, $laneIndex), 0)
+    !$distanceInPixelsToAdd = $desiredPosition - $laneWidth
+    !$distanceToPrevious = $_divRounded($distanceInPixelsToAdd, $autospacing_pixelsPerLineIncrement) + %intval($offset)
+    !if $distanceToPrevious < 0
+        !$distanceToPrevious = 0
+        ' Bump current positioning to right if this lane filled up
+        $_set($_currentWidth, $laneWidth)
+    !endif
+
+    ' Update laneWidth
+    !$laneWidth = %intval($laneWidth + $_estimateNodeWidthInPixels($figure, $name) + $distanceToPrevious * $autospacing_pixelsPerLineIncrement)
+    $_set($_laneWidth($laneType, $laneIndex), $laneWidth)
+
+    !return $distanceToPrevious
+!endfunction
+
+!procedure $_addNode($laneType, $laneIndex, $name, $alias = "", $figure, $stereotype = "", $offset = 0, $autoArrow = 0)
+    !$alias = $_createOrVerifyAlias($name, $alias)
+
+    ' Compute array append index
+    !$itemIndex = $_getAppendIndex($_nodeMaxIndex($laneType, $laneIndex))
+
+    !if $itemIndex == 0
+        ' First insertion of this lane: add header and register lane
+        $_insertHeadingNode($laneType, $laneIndex, $itemIndex)
+
+        ' Update index for the coming node
+        !$itemIndex = $_getAppendIndex($_nodeMaxIndex($laneType, $laneIndex))
+
+        ' Register lane (for laneTypes with only 1 lane. Named lanes are registered in $_lookupLaneIndex)
+        !if %not($_exists($_laneMaxIndex($laneType)))
+            $_set($_laneMaxIndex($laneType), 0)
+        !endif
+    !endif
+
+    ' Compute spacing
+    !$distanceToPrevious = $offset
+    !if $configuration_enable_auto_spacing == 1
+        !$distanceToPrevious = $_computeAutoSpacing($laneType, $laneIndex, $name, $figure, $offset)
+    !endif
+
+    ' Write into array
+    $_storeNode($laneType, $laneIndex, $itemIndex, $name, $alias, $figure, $stereotype, $distanceToPrevious)
+
+    ' Enable optional support for automatically adding an arrow from the previous node
+    $_autoAddArrow($alias, $stereotype, $autoArrow)
+!endprocedure
+
+!procedure $_autoAddArrow($currentNodeAlias, $currentNodeStereotype, $writeArrow)
+    !if $writeArrow == 1 && $_exists($_previousNode("alias")) && $_exists($_previousNode("stereotype"))
+        !$previousNodeAlias = $_get($_previousNode("alias"))
+        !$previousNodeStereotype = $_get($_previousNode("stereotype"))
+
+        ' Arrow is only placed on sensible nodeType order
+        !if $previousNodeStereotype == "wireframe"
+            !if $currentNodeStereotype == "command"
+                $arrow($previousNodeAlias, $currentNodeAlias)
+            !endif
+        !elseif $previousNodeStereotype == "command"
+            !if $currentNodeStereotype == "event"
+                $commandarrow($previousNodeAlias, $currentNodeAlias)
+            !endif
+        !elseif $previousNodeStereotype == "event"
+            !if $currentNodeStereotype == "view" || $currentNodeStereotype == "extra"
+                $eventarrow($previousNodeAlias, $currentNodeAlias)
+            !endif
+        !elseif $previousNodeStereotype == "view"
+            !if $currentNodeStereotype == "wireframe"
+                $arrow($previousNodeAlias, $currentNodeAlias)
+            !endif
+        !elseif $previousNodeStereotype == "extra"
+            !if $currentNodeStereotype == "command"
+                $commandarrow($previousNodeAlias, $currentNodeAlias)
+            !endif
+        !endif
+    
+    !endif
+
+    $_set($_previousNode("alias"), $currentNodeAlias)
+    $_set($_previousNode("stereotype"), $currentNodeStereotype)
+!endprocedure
+
+/'
+**************** Private procedures to render nodes, lanes, and arrows *********************
+'/
+!procedure $_renderNodesForLane($laneType, $laneIndex, $itemMaxIndex)
+    ' Render in backward order for correct left-to-right display
+    !$itemIndex = $itemMaxIndex
+    !while $itemIndex >= 0
+        ' Fetch node data
+        !$name = $_get($_node($laneType, $laneIndex, $itemIndex, "name"))
+        !$alias = $_get($_node($laneType, $laneIndex, $itemIndex, "alias"))
+        !$figure = $_get($_node($laneType, $laneIndex, $itemIndex, "figure"))
+        !$stereotype = $_get($_node($laneType, $laneIndex, $itemIndex, "stereotype"))
+
+        ' Render node
+        !$stereotypePart = "<<" + $stereotype + ">>"
+        !if $stereotype == ""
+            !$stereotypePart = ""
+        !endif
+        $figure "$name" as $alias $stereotypePart
+
+        !$itemIndex = $itemIndex - 1
+    !endwhile
+!endprocedure
+
+!procedure $_renderLaneInternalArrows($laneType, $laneIndex, $itemMaxIndex)
+    ' Render lane-internal arrows to keep all nodes horizontal and in order
+    !$itemIndex = 0
+    !$previousNodeAlias = $_get($_node($laneType, $laneIndex, $itemIndex, "alias"))
+    !$itemIndex = 1
+    !while $itemIndex <= $itemMaxIndex
+
+        !$currentNodeAlias = $_get($_node($laneType, $laneIndex, $itemIndex, "alias"))
+        !$currentNodeDistanceToPrevious = $_get($_node($laneType, $laneIndex, $itemIndex, "distanceToPrevious"))
+
+        !$arrowPart = "-[norank,hidden]" + $_repeatString("-", $currentNodeDistanceToPrevious) + "-"
+        ' Render arrow
+        $previousNodeAlias $arrowPart $currentNodeAlias
+
+        !$previousNodeAlias = $currentNodeAlias
+        !$itemIndex = $itemIndex + 1
+    !endwhile
+!endprocedure
+
+!procedure $_renderStructuralArrowToPreviousLane($laneType, $laneIndex, $itemMaxIndex)
+    ' Render arrow between headings to create a correct lane layout from top to bottom
+    !$currentHeadingNodeAlias = $_get($_node($laneType, $laneIndex, 0, "alias"))
+    !if $_exists($_previousHeadingNodeAlias)
+        !$previousHeadingNodeAlias = $_get($_previousHeadingNodeAlias)
+        ' Render the arrow
+        $previousHeadingNodeAlias -[hidden]d-> $currentHeadingNodeAlias
+    !endif
+    $_set($_previousHeadingNodeAlias, $currentHeadingNodeAlias)
+!endprocedure
+
+!procedure $_renderContextWrapper($laneType, $laneIndex)
+    !$contextName = $_getVarOrDefault($_context($laneType, $laneIndex, "name"), "")
+    !$contextAlias = $_getVarOrDefault($_context($laneType, $laneIndex, "alias"), "")
+    !$previousContextAlias = $_getVarOrDefault($_previousLaneContext, "")
+    !if $contextAlias != $previousContextAlias
+        !if $previousContextAlias != ""
+            ' Render context close
+            '   Note that the closing accolade for the final line may be placed in $_renderLaneTypes
+            }
+        !endif
+        !if $contextAlias != ""
+            ' Render context
+            $context_default_figure "$contextName" as $contextAlias {
+        !endif
+    !endif
+    $_set($_previousLaneContext, $contextAlias)
+!endprocedure
+
+!procedure $_renderLanesForType($laneType)
+    !$laneIndex = 0
+    !$laneMaxIndex = $_getVarOrDefault($_laneMaxIndex($laneType), -1)
+    !while $laneIndex <= $laneMaxIndex
+
+        !$itemMaxIndex = $_getVarOrDefault($_nodeMaxIndex($laneType, $laneIndex), -1)
+
+        ' Check if the lane is not empty and contains more than just the heading node
+        !if $itemMaxIndex > 0
+
+            ' Render context wrapper, if configured
+            $_renderContextWrapper($laneType, $laneIndex)
+
+            ' Render hidden container for all nodes
+            !$containerNodeName = "rect-" + $laneType + "-" + $laneIndex
+            rectangle $containerNodeName <<hidden>> {
+                $_renderNodesForLane($laneType, $laneIndex, $itemMaxIndex)
+                $_renderLaneInternalArrows($laneType, $laneIndex, $itemMaxIndex)
+            }
+
+            $_renderStructuralArrowToPreviousLane($laneType, $laneIndex, $itemMaxIndex)
+        !endif
+
+    !$laneIndex = $laneIndex + 1
+    !endwhile
+!endprocedure
+
+!procedure $_renderLaneTypes()
+    !$laneTypeIndex = 0
+    !$laneTypeMaxIndex = $_get($_laneTypeOrderMaxIndex)
+    !$laneType = ""
+    !while $laneTypeIndex <= $laneTypeMaxIndex
+        !$laneType = $_get($_laneTypeOrder($laneTypeIndex))
+
+        $_renderLanesForType($laneType)
+
+        !$laneTypeIndex = $laneTypeIndex + 1
+    !endwhile
+
+    ' Close the remaining context, if present
+    !if $_getVarOrDefault($_previousLaneContext, "") != ""
+        }
+    !endif
+!endprocedure
+
+!procedure $_renderArrows()
+    !$arrowIndex = 0
+    !$arrowMaxIndex = $_getVarOrDefault($_arrowsMaxIndex, -1)
+
+    !while $arrowIndex <= $arrowMaxIndex
+        !$fromAlias = $_get($_arrow($arrowIndex, "fromAlias"))
+        !$toAlias = $_get($_arrow($arrowIndex, "toAlias"))
+        !$stereotype = $_get($_arrow($arrowIndex, "stereotype"))
+        !$arrowHead = $_get($_arrow($arrowIndex, "arrowHead"))
+
+        !$arrowPart = "-[norank]-" + $arrowHead
+        !$stereotypePart = "<<" + $stereotype + ">>"
+        !if $stereotype == ""
+            !$stereotypePart = ""
+        !endif
+
+        ' Render the arrow
+        $fromAlias $arrowPart $toAlias $stereotypePart
+
+        !$arrowIndex = $arrowIndex + 1
+    !endwhile
+!endprocedure
+
+/'
+**************** Public configuration procedures *********************
+'/
+!procedure $enableAutoAlias()
+    !$configuration_enable_auto_alias = 1
+!endprocedure
+
+!procedure $enableAutoSpacing()
+    !$configuration_enable_auto_spacing = 1
+!endprocedure
+
+!unquoted procedure $configureWireframeLane($laneAlias, $headingName = "", $headingAlias = "")
+    !if $headingName == ""
+        !$headingName = $laneAlias
+    !endif
+    !$laneAlias = $_createOrVerifyAlias($laneAlias)
+    !if $headingAlias == ""
+        !$headingAlias = $laneAlias + "heading"
+    !endif
+    !$headingAlias = $_createOrVerifyAlias($headingName, $headingAlias)
+    !$laneIndex = $_lookupLaneIndex("wireframe", $laneAlias)
+    $_configureLane("wireframe", $laneIndex, $laneAlias, $headingName, $wireframe_heading_default_figure, "", $headingAlias)
+!endprocedure
+
+!unquoted procedure $configureEventLane($laneAlias, $headingName = "", $headingAlias = "", $context = "")
+    !if $headingName == ""
+        !$headingName = $laneAlias
+    !endif
+    !$laneAlias = $_createOrVerifyAlias($laneAlias)
+    !if $headingAlias == ""
+        !$headingAlias = $laneAlias + "heading"
+    !endif
+    !$headingAlias = $_createOrVerifyAlias($headingName, $headingAlias)
+    !$laneIndex = $_lookupLaneIndex("event", $laneAlias)
+    $_configureLane("event", $laneIndex, $laneAlias, $headingName, $event_heading_default_figure, "concept", $headingAlias, $context)
+!endprocedure
+
+/'
+**************** Public procedures to record nodes and arrows *********************
+'/
+
+!unquoted procedure $extra($name, $offset = 0, $arrow = 1, $alias = "", $figure = $default_figure)
+    $_addNode("extra", 0, $name, $alias, $figure, "extra", $offset, $arrow)
+!endprocedure
+
+!unquoted procedure $wireframe($name, $laneAlias = "defaultLane", $offset = 0, $arrow = 1, $alias = "", $figure = $default_figure)
+    !$laneIndex = $_lookupLaneIndex("wireframe", $laneAlias)
+    $_addNode("wireframe", $laneIndex, $name, $alias, $figure, "wireframe", $offset, $arrow)
+!endprocedure
+
+!unquoted procedure $command($name, $offset = 0, $arrow = 1, $alias = "", $figure = $default_figure)
+    $_addNode("commandview", 0, $name, $alias, $figure, "command", $offset, $arrow)
+!endprocedure
+
+!unquoted procedure $view($name, $offset = 0, $arrow = 1, $alias = "", $figure = $default_figure)
+    $_addNode("commandview", 0, $name, $alias, $figure, "view", $offset, $arrow)
+!endprocedure
+
+!unquoted procedure $event($name, $laneAlias = "defaultLane", $offset = 0, $arrow = 1, $alias = "", $figure = $default_figure)
+    !$laneIndex = $_lookupLaneIndex("event", $laneAlias)
+    $_addNode("event", $laneIndex, $name, $alias, $figure, "event", $offset, $arrow)
+!endprocedure
+
+!unquoted procedure $commandarrow($from, $to)
+    $_addArrow($from, $to, commandarrow)
+!endprocedure
+
+!unquoted procedure $eventarrow($from, $to)
+    $_addArrow($from, $to, eventarrow)
+!endprocedure
+
+!unquoted procedure $arrow($from, $to)
+    $_addArrow($from, $to, defaultarrow)
+!endprocedure
+
+/'
+**************** Public procedures to render the recorded nodes *********************
+'/
+
+!procedure $renderEventModelingDiagram()
+    $_renderLaneTypes()
+    $_renderArrows()
+!endprocedure
+
+
+@enduml
