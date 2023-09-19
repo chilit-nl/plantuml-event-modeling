@@ -12,6 +12,9 @@ $configureEventLane(Payment, $context = "Booking context")
 $configureEventLane(Lesson, $context = "Teacher context")
 $configureEventLane(Teacher, $context = "Teacher context")
 
+$configurePolicyLane(SomeSaga, $context = "Cross context sagas")
+
+
 $wireframe(Teacher Registration Screen, Manager)
 $command(Register Teacher)
 $event(Teacher Registered, Teacher)
@@ -26,6 +29,11 @@ $wireframe(Manage Lesson Screen, Manager)
 $command(Assign Lesson to Teacher)
 $event(Lesson Assigned, Lesson1)
 $view(Lesson)
+
+$command(Strange Command, SomeSaga)
+$eventarrow(Lesson Created, Strange Command)
+$commandarrow(Strange Command, Lesson Added)
+
 
 $wireframe(Manage Lesson Screen, Manager)
 $command(Publish Lesson)
@@ -77,9 +85,6 @@ $eventarrow(Payment Accepted, Payments to Process1)
 $view(Reports)
 
 $wireframe(Management Report Screen, Manager)
-
-
-
 
 $renderEventModelingDiagram()
 @enduml

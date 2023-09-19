@@ -61,6 +61,7 @@ Configuration:
 - **$enableAutoSpacing()** - Automatically positions elements horizontally based on the order of definition. Due to limitations of PlantUML the positioning is not perfect. The resulting position can be adjusted with the $offset parameter on an element.
 - **\$configureWireframeLane($laneAlias, $headingName = "", $headingAlias = "")** - Provides the lane with an alias, which is used to reference the lane when adding a wireframe element. The actor at the beginning of the lane is named with $headingName, which defaults to $laneAlias
 - **\$configureEventLane($laneAlias, $headingName = "", $headingAlias = "", $context = "")** - similar to $configureWireframeLane, but allows for defining a bounded context for this lane.
+- **\$configurePolicyLane($laneAlias, $headingName = "", $headingAlias = "", $context = "")** - similar to $configureWireframeLane, but allows for defining a saga context for this lane.
 
 Adding elements:
 
@@ -72,7 +73,7 @@ Adding elements:
     - **$alias** - Manually provide an alias to reference this element by. This can be useful when renaming the element without having to adjust the references.
     - **$figure** - Allows changing the visual figure for this element. All PlantUML figures for the [deployment diagram](https://plantuml.com/deployment-diagram) are available.
 - **\$command($name, $offset = 0, $arrow = 1, $alias = "", $figure = $default_figure)**
-- **\$view($name, $offset = 0, $arrow = 1, $alias = "", $figure = $default_figure)**
+- **\$view($name, $laneAlias = "defaultLane", $offset = 0, $arrow = 1, $alias = "", $figure = $default_figure)**
 - **\$event($name, $laneAlias = "defaultLane", $offset = 0, $arrow = 1, $alias = "", $figure = $default_figure)**
 - **\$extra($name, $offset = 0, $arrow = 1, $alias = "", $figure = $default_figure)** - These elements are placed at the top lane and can be used for e.g. translation, automation, and sagas.
 

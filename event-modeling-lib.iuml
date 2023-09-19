@@ -24,10 +24,13 @@
         BackgroundColor yellow
     }
     .extra {
-        BackgroundColor #eee
+        BackgroundColor #eee$configurePolicyLane
     }
     .wireframe {
         BackgroundColor #fff
+    }
+    .policy {
+        BackgroundColor #d7d
     }
     .hidden {
         FontSize 0
@@ -83,6 +86,7 @@ hide <<extra>> stereotype
 !$event_heading_default_figure = $default_figure
 !$wireframe_heading_default_figure = "actor"
 !$context_default_figure = "frame"
+!$saga_heading_default_figure = $default_figure
 
 !$configuration_enable_auto_alias = 0
 !$configuration_enable_auto_spacing = 0
@@ -315,7 +319,8 @@ The variables can be mutated using $_get, $_set, and $_exists
     $_set($_laneTypeOrder(1), "wireframe")
     $_set($_laneTypeOrder(2), "commandview")
     $_set($_laneTypeOrder(3), "event")
-    $_set($_laneTypeOrderMaxIndex, 3)
+    $_set($_laneTypeOrder(4), "policy")
+    $_set($_laneTypeOrderMaxIndex, 4)
 !endprocedure
 $_autoConfigureLaneTypes()
 
@@ -649,6 +654,20 @@ $_autoConfigureLaneTypes()
     $_configureLane("event", $laneIndex, $laneAlias, $headingName, $event_heading_default_figure, "concept", $headingAlias, $context)
 !endprocedure
 
+!unquoted procedure $configurePolicyLane($laneAlias, $headingName = "", $headingAlias = "", $context = "")
+    !if $headingName == ""
+        !$headingName = $laneAlias
+    !endif
+    !$laneAlias = $_createOrVerifyAlias($laneAlias)
+    !if $headingAlias == ""
+        !$headingAlias = $laneAlias + "heading"
+    !endif
+    !$headingAlias = $_createOrVerifyAlias($headingName, $headingAlias)
+    !$laneIndex = $_lookupLaneIndex("policy", $laneAlias)
+    $_configureLane("policy", $laneIndex, $laneAlias, $headingName, $saga_heading_default_figure, "policy", $headingAlias, $context)
+!endprocedure
+
+
 /'
 **************** Public procedures to record nodes and arrows *********************
 '/
@@ -662,8 +681,13 @@ $_autoConfigureLaneTypes()
     $_addNode("wireframe", $laneIndex, $name, $alias, $figure, "wireframe", $offset, $arrow)
 !endprocedure
 
-!unquoted procedure $command($name, $offset = 0, $arrow = 1, $alias = "", $figure = $default_figure)
-    $_addNode("commandview", 0, $name, $alias, $figure, "command", $offset, $arrow)
+!unquoted procedure $command($name, $laneAlias = "commandview", $offset = 0, $arrow = 1, $alias = "", $figure = $default_figure)
+    !if $laneAlias == "commandview"
+        $_addNode("commandview", 0, $name, $alias, $figure, "command", $offset, $arrow)
+    !else
+        !$laneIndex = $_lookupLaneIndex("policy", $laneAlias)
+        $_addNode("policy", $laneIndex, $name, $alias, $figure, "command", $offset, $arrow)
+    !endif
 !endprocedure
 
 !unquoted procedure $view($name, $offset = 0, $arrow = 1, $alias = "", $figure = $default_figure)
