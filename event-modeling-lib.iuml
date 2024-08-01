@@ -476,9 +476,9 @@ $_autoConfigureLaneTypes()
 **************** Private procedures to render nodes, lanes, and arrows *********************
 '/
 !procedure $_renderNodesForLane($laneType, $laneIndex, $itemMaxIndex)
-    ' Render in backward order for correct left-to-right display
-    !$itemIndex = $itemMaxIndex
-    !while $itemIndex >= 0
+    ' Render in forward order for correct left-to-right display
+    !$itemIndex = 0
+    !while $itemIndex <= $itemMaxIndex
         ' Fetch node data
         !$name = $_get($_node($laneType, $laneIndex, $itemIndex, "name"))
         !$alias = $_get($_node($laneType, $laneIndex, $itemIndex, "alias"))
@@ -492,7 +492,7 @@ $_autoConfigureLaneTypes()
         !endif
         $figure "$name" as $alias $stereotypePart
 
-        !$itemIndex = $itemIndex - 1
+        !$itemIndex = $itemIndex + 1
     !endwhile
 !endprocedure
 
